@@ -10,9 +10,15 @@ import '../widgets/custom_text.dart';
 import 'detail_screen.dart';
 
 class ProductScreen extends StatefulWidget {
-  const ProductScreen({super.key, this.cart, this.onCartChanged});
+  const ProductScreen({
+    super.key,
+    this.cart,
+    this.userId = demoUserId,
+    this.onCartChanged,
+  });
 
   final Cart? cart;
+  final int userId;
   final ValueChanged<Cart>? onCartChanged;
 
   @override
@@ -76,7 +82,7 @@ class _ProductScreenState extends State<ProductScreen> {
     setState(() => _addingProductIds.add(product.id));
     try {
       final currentCart =
-          widget.cart ?? _localCart ?? Cart.empty(userId: demoUserId);
+          widget.cart ?? _localCart ?? Cart.empty(userId: widget.userId);
 
       // Enhancement 3: pass Product values to the documented /carts/add API.
       final updatedCart = await _cartService.addProductToCart(

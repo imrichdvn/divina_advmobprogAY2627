@@ -2,16 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../models/cart.dart';
+import '../models/user.dart';
+import '../services/user_service.dart';
 import '../widgets/custom_text.dart';
 import 'cart_screen.dart';
 import 'product_screen.dart';
+import 'profile_screen.dart';
+import 'sign_in_screen.dart';
 
 const _logoAsset = 'assets/images/bulldogs exchange logo.png';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, this.username = ''});
+  const HomeScreen({super.key, required this.user});
 
-  final String username;
+  final User user;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -23,6 +27,22 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _updateCart(Cart cart) {
     if (mounted) setState(() => _cart = cart);
+  }
+
+  Future<void> _signOut() async {
+    try {
+      await UserService().signOut();
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil<void>(
+        MaterialPageRoute<void>(builder: (_) => const SignInScreen()),
+        (_) => false,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not sign out: $error')));
+    }
   }
 
   void _openChat() {
@@ -54,9 +74,17 @@ class _HomeScreenState extends State<HomeScreen> {
         body: IndexedStack(
           index: _selectedIndex,
           children: [
-            ProductScreen(cart: _cart, onCartChanged: _updateCart),
-            CartScreen(cart: _cart, onCartChanged: _updateCart),
-            const _ProfileTab(),
+            ProductScreen(
+              cart: _cart,
+              userId: widget.user.id,
+              onCartChanged: _updateCart,
+            ),
+            CartScreen(
+              cart: _cart,
+              userId: widget.user.id,
+              onCartChanged: _updateCart,
+            ),
+            ProfileScreen(user: widget.user, onSignOut: _signOut),
           ],
         ),
         // Enhancement 2: Chat is the FAB and is hidden on CartScreen.
@@ -168,50 +196,6 @@ class _ChatSheet extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _ProfileTab extends StatelessWidget {
-  const _ProfileTab();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: EdgeInsets.all(24.r),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 150.w,
-              height: 132.h,
-              padding: EdgeInsets.all(10.r),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(22.r),
-              ),
-              child: Image.asset(
-                _logoAsset,
-                fit: BoxFit.contain,
-                errorBuilder: (_, _, _) => Icon(Icons.storefront, size: 60.sp),
-              ),
-            ),
-            SizedBox(height: 18.h),
-            Text(
-              'Bulldogs Exchange customer',
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            SizedBox(height: 8.h),
-            const Text(
-              'Your account details will appear here.',
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
       ),
     );
   }

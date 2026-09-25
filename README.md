@@ -1,6 +1,6 @@
 # Bulldogs Exchange
 
-Bulldogs Exchange is a Flutter e-commerce application created for **Lab Activity 3 - API Part II**. It displays the complete DummyJSON product catalog and demonstrates cart retrieval, cart creation, shared product details, quantity management, navigation, and theme switching.
+Bulldogs Exchange is a Flutter e-commerce application built with DummyJSON. It includes the product catalog and cart from **Lab Activity 3 - API Part II**, plus persistent sign-in and a user profile from **Lab Activity 4 - API Part III**.
 
 ## Features
 
@@ -16,6 +16,11 @@ Bulldogs Exchange is a Flutter e-commerce application created for **Lab Activity
 - Hides the Chat button while the Cart screen is selected.
 - Displays the Bulldogs Exchange logo in the Home header and Profile screen.
 - Supports light and dark themes from the Settings screen.
+- Signs in through the DummyJSON authentication endpoint.
+- Restores the saved user profile on launch and clears it on sign-out.
+- Displays the signed-in user's name, avatar, email, and account details.
+- Provides interactive like and comment controls on profile update placeholders.
+- Loads and creates carts using the signed-in user's ID.
 
 ## Project Structure
 
@@ -23,7 +28,8 @@ Bulldogs Exchange is a Flutter e-commerce application created for **Lab Activity
 lib/
 |-- models/
 |   |-- cart.dart
-|   `-- product.dart
+|   |-- product.dart
+|   `-- user.dart
 |-- providers/
 |   `-- theme_provider.dart
 |-- screens/
@@ -31,10 +37,14 @@ lib/
 |   |-- detail_screen.dart
 |   |-- home_screen.dart
 |   |-- product_screen.dart
+|   |-- profile_screen.dart
+|   |-- sign_in_screen.dart
+|   |-- splash_screen.dart
 |   `-- settings_screen.dart
 |-- services/
 |   |-- cart_service.dart
-|   `-- product_service.dart
+|   |-- product_service.dart
+|   `-- user_service.dart
 |-- widgets/
 |   `-- custom_text.dart
 |-- constants.dart
@@ -55,6 +65,7 @@ The application communicates directly with DummyJSON and does not require a sepa
 
 | Purpose | Method | Endpoint |
 |---|---|---|
+| Sign in | `POST` | `/auth/login` |
 | Complete product catalog | `GET` | `/products?limit=0` |
 | Single product | `GET` | `/products/{productId}` |
 | All carts | `GET` | `/carts` |
@@ -62,7 +73,7 @@ The application communicates directly with DummyJSON and does not require a sepa
 | Carts by user ID | `GET` | `/carts/user/{userId}` |
 | Add a cart | `POST` | `/carts/add` |
 
-The activity uses demo user ID `1`. DummyJSON simulates cart creation and returns the newly constructed cart, but it does not permanently save POST requests. The returned cart is therefore retained in the application's local state for the current session.
+The user ID returned by `/auth/login` is passed to both cart retrieval and cart creation. DummyJSON simulates cart creation and returns the newly constructed cart, but it does not permanently save POST requests. The returned cart is retained in the application's memory for the current session.
 
 ## Lab Activity 3 Discussion
 
@@ -103,6 +114,28 @@ This separation keeps networking out of the widgets, prevents models from depend
 1. **Cart screen and shared details:** The application renders one user's cart. Every cart item is clickable and opens `DetailScreen`.
 2. **Floating Chat button:** Chat is implemented as a floating action button on Home and Profile and is hidden on the Cart screen.
 3. **User cart and Add to Cart:** The application loads a cart by user ID and sends product IDs and quantities to `https://dummyjson.com/carts/add`.
+
+## Lab Activity 4 Discussion
+
+### User Model, Service, and Screens
+
+`UserService.signIn` sends the username and password to `POST /auth/login`, parses the response into the `User` model, and saves a profile snapshot with `shared_preferences`. The password and authentication tokens are not stored. `SplashScreen` checks for that saved profile when the app starts: a returning user goes directly to `HomeScreen`, while a new or signed-out user sees `SignInScreen`.
+
+After sign-in, `HomeScreen` owns the authenticated `User` and passes it to `ProfileScreen`. The profile renders the user's name, username, email, ID, gender, and remote avatar, with initials shown when the image is missing or unavailable. Its example update cards provide working like and comment controls. Signing out removes the saved profile before returning to sign-in.
+
+### Updated Design Pattern
+
+The app uses a layered model-service-screen pattern. `User` maps API and locally saved profile data. `UserService` owns the authentication request, response parsing, and session persistence. `SplashScreen` and `SignInScreen` control session routing and form state; `HomeScreen` distributes the authenticated user; `ProfileScreen` renders it. These boundaries keep HTTP and preference operations out of the UI widgets.
+
+### Cart for the Saved User
+
+`HomeScreen` passes `user.id` to both `ProductScreen` and `CartScreen`. The cart screen requests `GET /carts/user/{userId}` through `CartService`; adding products and confirming an order use that same ID in the request body. This keeps cart data associated with the signed-in profile instead of a hard-coded demo account.
+
+The saved profile is a local session convenience, not a protected credential store or a server-validated token session. The app deliberately does not persist the password or returned tokens. A production service should use secure token storage and revalidate/refresh the session with its backend.
+
+### Demo Sign-In
+
+DummyJSON provides demo users. For example, use username `emilys` and password `emilyspass` to test the sign-in flow. The API is a demonstration service and does not create real customer accounts.
 
 ## Cart Quantity Behavior
 
