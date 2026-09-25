@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../services/user_service.dart';
-import 'home_screen.dart';
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key, this.userService});
@@ -36,14 +35,18 @@ class _SignInScreenState extends State<SignInScreen> {
 
     try {
       // Enhancement 2: authenticate with UserService and persist the returned profile.
-      final user = await (widget.userService ?? UserService()).signIn(
-        username: _usernameController.text.trim(),
-        password: _passwordController.text,
+      final userService = widget.userService ?? UserService();
+      final userData = await userService.loginUser(
+        _usernameController.text.trim(),
+        _passwordController.text,
       );
+      await userService.saveUserData(userData);
       if (!mounted) return;
-      Navigator.of(context).pushAndRemoveUntil<void>(
-        MaterialPageRoute<void>(builder: (_) => HomeScreen(user: user)),
+      await Navigator.pushNamedAndRemoveUntil<void>(
+        context,
+        '/home',
         (_) => false,
+        arguments: userData,
       );
     } catch (error) {
       if (!mounted) return;

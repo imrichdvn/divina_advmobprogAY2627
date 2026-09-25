@@ -8,7 +8,6 @@ import '../widgets/custom_text.dart';
 import 'cart_screen.dart';
 import 'product_screen.dart';
 import 'profile_screen.dart';
-import 'sign_in_screen.dart';
 
 const _logoAsset = 'assets/images/bulldogs exchange logo.png';
 
@@ -31,10 +30,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _signOut() async {
     try {
-      await UserService().signOut();
+      await UserService().logout();
       if (!mounted) return;
-      Navigator.of(context).pushAndRemoveUntil<void>(
-        MaterialPageRoute<void>(builder: (_) => const SignInScreen()),
+      await Navigator.pushNamedAndRemoveUntil<void>(
+        context,
+        '/signin',
         (_) => false,
       );
     } catch (error) {

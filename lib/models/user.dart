@@ -7,6 +7,8 @@ class User {
     required this.lastName,
     required this.gender,
     required this.image,
+    this.accessToken = '',
+    this.refreshToken = '',
   });
 
   final int id;
@@ -16,6 +18,8 @@ class User {
   final String lastName;
   final String gender;
   final String image;
+  final String accessToken;
+  final String refreshToken;
 
   String get fullName => '$firstName $lastName'.trim();
 
@@ -28,6 +32,9 @@ class User {
       lastName: json['lastName'] as String? ?? '',
       gender: json['gender'] as String? ?? '',
       image: json['image'] as String? ?? '',
+      accessToken:
+          json['accessToken'] as String? ?? json['token'] as String? ?? '',
+      refreshToken: json['refreshToken'] as String? ?? '',
     );
   }
 
@@ -39,5 +46,7 @@ class User {
     'lastName': lastName,
     'gender': gender,
     'image': image,
+    'accessToken': accessToken,
+    'refreshToken': refreshToken,
   };
 }

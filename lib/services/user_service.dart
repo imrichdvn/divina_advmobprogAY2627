@@ -11,60 +11,85 @@ class UserService {
     : _client = client ?? http.Client(),
       _preferences = preferences;
 
-  static const _savedUserKey = 'saved_user';
-
   final http.Client _client;
   final SharedPreferences? _preferences;
 
-  Future<User> signIn({
-    required String username,
-    required String password,
-  }) async {
+  Future<Map<String, dynamic>> loginUser(
+    String username,
+    String password,
+  ) async {
     final response = await _client.post(
       Uri.parse('$apiHost/auth/login'),
       headers: const {'Content-Type': 'application/json'},
-      body: jsonEncode({'username': username, 'password': password}),
+      body: jsonEncode({
+        'username': username,
+        'password': password,
+        'expiresInMins': 60,
+      }),
     );
 
-    final decoded = jsonDecode(response.body);
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      final message = decoded is Map<String, dynamic>
-          ? decoded['message'] as String? ?? 'Sign in failed.'
-          : 'Sign in failed.';
-      throw Exception(message);
-    }
-
-    final user = User.fromJson(decoded as Map<String, dynamic>);
-    if (user.id <= 0) throw Exception('The server returned an invalid user.');
-    await saveSession(user);
-    return user;
+    if (response.statusCode != 200) throw Exception(response.body);
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    await saveUserData(data);
+    return data;
   }
 
-  Future<User?> getSavedUser() async {
+  Future<void> saveUserData(Map<String, dynamic> userData) async {
     final preferences = await _getPreferences();
-    final savedUser = preferences.getString(_savedUserKey);
-    if (savedUser == null) return null;
-
-    try {
-      return User.fromJson(jsonDecode(savedUser) as Map<String, dynamic>);
-    } on FormatException {
-      await preferences.remove(_savedUserKey);
-      return null;
-    } on TypeError {
-      await preferences.remove(_savedUserKey);
-      return null;
+    final user = User.fromJson(userData);
+    await preferences.setInt('id', user.id);
+    await preferences.setString('username', user.username);
+    await preferences.setString('email', user.email);
+    await preferences.setString('firstName', user.firstName);
+    await preferences.setString('lastName', user.lastName);
+    await preferences.setString('gender', user.gender);
+    await preferences.setString('image', user.image);
+    final accessToken =
+        userData['accessToken'] as String? ??
+        userData['token'] as String? ??
+        user.accessToken;
+    await preferences.setString('accessToken', accessToken);
+    await preferences.setString('refreshToken', user.refreshToken);
+    if (accessToken.isNotEmpty) {
+      await preferences.setString('token', accessToken);
     }
   }
 
-  Future<void> saveSession(User user) async {
-    await (await _getPreferences()).setString(
-      _savedUserKey,
-      jsonEncode(user.toJson()),
-    );
+  Future<Map<String, dynamic>> getUserData() async {
+    final preferences = await _getPreferences();
+    return {
+      'id': preferences.getInt('id') ?? 0,
+      'username': preferences.getString('username') ?? '',
+      'email': preferences.getString('email') ?? '',
+      'firstName': preferences.getString('firstName') ?? '',
+      'lastName': preferences.getString('lastName') ?? '',
+      'gender': preferences.getString('gender') ?? '',
+      'image': preferences.getString('image') ?? '',
+      'accessToken':
+          preferences.getString('accessToken') ??
+          preferences.getString('token') ??
+          '',
+      'refreshToken': preferences.getString('refreshToken') ?? '',
+      'token':
+          preferences.getString('token') ??
+          preferences.getString('accessToken') ??
+          '',
+    };
   }
 
-  Future<void> signOut() async {
-    await (await _getPreferences()).remove(_savedUserKey);
+  Future<User> getUser() async {
+    return User.fromJson(await getUserData());
+  }
+
+  Future<bool> isLoggedIn() async {
+    final preferences = await _getPreferences();
+    final token =
+        preferences.getString('accessToken') ?? preferences.getString('token');
+    return token != null && token.isNotEmpty;
+  }
+
+  Future<void> logout() async {
+    await (await _getPreferences()).clear();
   }
 
   Future<SharedPreferences> _getPreferences() async {

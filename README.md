@@ -119,9 +119,9 @@ This separation keeps networking out of the widgets, prevents models from depend
 
 ### User Model, Service, and Screens
 
-`UserService.signIn` sends the username and password to `POST /auth/login`, parses the response into the `User` model, and saves a profile snapshot with `shared_preferences`. The password and authentication tokens are not stored. `SplashScreen` checks for that saved profile when the app starts: a returning user goes directly to `HomeScreen`, while a new or signed-out user sees `SignInScreen`.
+`UserService.loginUser` sends the username, password, and `expiresInMins: 60` to `POST /auth/login`. It parses the response into the `User` model and saves the profile fields and API tokens individually with `shared_preferences`. `SplashScreen` displays for 1.5 seconds, checks for a saved access token, and routes a returning user to `/home` with the saved user data; a new or signed-out user is routed to `/signin`.
 
-After sign-in, `HomeScreen` owns the authenticated `User` and passes it to `ProfileScreen`. The profile renders the user's name, username, email, ID, gender, and remote avatar, with initials shown when the image is missing or unavailable. Its example update cards provide working like and comment controls. Signing out removes the saved profile before returning to sign-in.
+After sign-in, `SignInScreen` passes the returned user data as the `/home` route argument. `HomeScreen` converts it to the authenticated `User` model and passes it to `ProfileScreen`. The profile renders the user's name, username, email, ID, gender, and remote avatar, with initials shown when the image is missing or unavailable. Its example update cards provide working like and comment controls. Signing out clears the saved preferences before returning to sign-in.
 
 ### Updated Design Pattern
 
@@ -131,7 +131,7 @@ The app uses a layered model-service-screen pattern. `User` maps API and locally
 
 `HomeScreen` passes `user.id` to both `ProductScreen` and `CartScreen`. The cart screen requests `GET /carts/user/{userId}` through `CartService`; adding products and confirming an order use that same ID in the request body. This keeps cart data associated with the signed-in profile instead of a hard-coded demo account.
 
-The saved profile is a local session convenience, not a protected credential store or a server-validated token session. The app deliberately does not persist the password or returned tokens. A production service should use secure token storage and revalidate/refresh the session with its backend.
+The password is never saved. Following the lab sample, the access and refresh tokens are saved in `shared_preferences`, and token presence is used to restore the demo session. Preferences are not encrypted secure storage, and the demo does not refresh or server-validate a restored token. A production service should use secure token storage and validate/refresh sessions with its backend.
 
 ### Demo Sign-In
 

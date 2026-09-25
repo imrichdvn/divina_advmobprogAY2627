@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../models/user.dart';
 import '../services/user_service.dart';
-import 'home_screen.dart';
-import 'sign_in_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key, this.userService});
@@ -18,25 +15,34 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    _restoreSession();
+    _checkAuthentication();
   }
 
-  Future<void> _restoreSession() async {
-    User? user;
-    try {
-      // Enhancement 1: restore the saved profile before selecting the first screen.
-      user = await (widget.userService ?? UserService()).getSavedUser();
-    } catch (_) {
-      user = null;
-    }
-
+  Future<void> _checkAuthentication() async {
+    await Future<void>.delayed(const Duration(milliseconds: 1500));
     if (!mounted) return;
-    final destination = user == null
-        ? const SignInScreen()
-        : HomeScreen(user: user);
-    Navigator.of(
-      context,
-    ).pushReplacement(MaterialPageRoute<void>(builder: (_) => destination));
+
+    try {
+      final userService = widget.userService ?? UserService();
+      final loggedIn = await userService.isLoggedIn();
+      if (!mounted) return;
+
+      if (loggedIn) {
+        // Enhancement 1: restore the profile and route returning users to Home.
+        final userData = await userService.getUserData();
+        if (!mounted) return;
+        await Navigator.pushReplacementNamed<void, void>(
+          context,
+          '/home',
+          arguments: userData,
+        );
+      } else {
+        await Navigator.pushReplacementNamed<void, void>(context, '/signin');
+      }
+    } catch (_) {
+      if (!mounted) return;
+      await Navigator.pushReplacementNamed<void, void>(context, '/signin');
+    }
   }
 
   @override

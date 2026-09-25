@@ -4,9 +4,11 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 
+import 'models/user.dart';
 import 'providers/theme_provider.dart';
-import 'screens/sign_in_screen.dart';
+import 'screens/home_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/sign_in_screen.dart';
 import 'screens/splash_screen.dart';
 
 Future<void> main() async {
@@ -38,7 +40,14 @@ class DivinaAdvMobProg extends StatelessWidget {
             initialRoute: '/',
             routes: {
               '/': (context) => const SplashScreen(),
-              '/sign-in': (context) => const SignInScreen(),
+              '/signin': (context) => const SignInScreen(),
+              '/home': (context) {
+                final arguments = ModalRoute.of(context)?.settings.arguments;
+                if (arguments is Map<String, dynamic>) {
+                  return HomeScreen(user: User.fromJson(arguments));
+                }
+                return const SplashScreen();
+              },
               '/settings': (context) => const SettingsScreen(),
             },
           );
