@@ -1,3 +1,16 @@
+enum LoginType {
+  dummyJson,
+  firebase;
+
+  String get storageValue => name;
+
+  String get label => this == LoginType.firebase ? 'Firebase' : 'DummyJSON';
+
+  static LoginType fromValue(Object? value) {
+    return value == firebase.name ? firebase : dummyJson;
+  }
+}
+
 class User {
   const User({
     required this.id,
@@ -7,6 +20,9 @@ class User {
     required this.lastName,
     required this.gender,
     required this.image,
+    this.age = 0,
+    this.contactNo = '',
+    this.loginType = LoginType.dummyJson,
     this.accessToken = '',
     this.refreshToken = '',
   });
@@ -18,6 +34,9 @@ class User {
   final String lastName;
   final String gender;
   final String image;
+  final int age;
+  final String contactNo;
+  final LoginType loginType;
   final String accessToken;
   final String refreshToken;
 
@@ -32,6 +51,9 @@ class User {
       lastName: json['lastName'] as String? ?? '',
       gender: json['gender'] as String? ?? '',
       image: json['image'] as String? ?? '',
+      age: (json['age'] as num?)?.toInt() ?? 0,
+      contactNo: json['contactNo'] as String? ?? json['phone'] as String? ?? '',
+      loginType: LoginType.fromValue(json['loginType']),
       accessToken:
           json['accessToken'] as String? ?? json['token'] as String? ?? '',
       refreshToken: json['refreshToken'] as String? ?? '',
@@ -46,6 +68,9 @@ class User {
     'lastName': lastName,
     'gender': gender,
     'image': image,
+    'age': age,
+    'contactNo': contactNo,
+    'loginType': loginType.storageValue,
     'accessToken': accessToken,
     'refreshToken': refreshToken,
   };

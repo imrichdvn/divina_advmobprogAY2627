@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/user.dart';
 import '../services/user_service.dart';
 
 class SignInScreen extends StatefulWidget {
@@ -17,6 +18,7 @@ class _SignInScreenState extends State<SignInScreen> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _signingIn = false;
+  LoginType _loginType = LoginType.dummyJson;
   String? _error;
 
   @override
@@ -36,15 +38,19 @@ class _SignInScreenState extends State<SignInScreen> {
     try {
       // Enhancement 2: authenticate with UserService and persist the returned profile.
       final userService = widget.userService ?? UserService();
-      final userData = await userService.loginUser(
-        _usernameController.text.trim(),
-        _passwordController.text,
-      );
-      await userService.saveUserData(userData);
+      final userData = _loginType == LoginType.firebase
+          ? await userService.signInWithFirebase(
+              _usernameController.text.trim(),
+              _passwordController.text,
+            )
+          : await userService.loginUser(
+              _usernameController.text.trim(),
+              _passwordController.text,
+            );
       if (!mounted) return;
       await Navigator.pushNamedAndRemoveUntil<void>(
         context,
-        '/home',
+        '/welcome',
         (_) => false,
         arguments: userData,
       );
@@ -101,19 +107,62 @@ class _SignInScreenState extends State<SignInScreen> {
                       style: Theme.of(context).textTheme.bodyLarge,
                     ),
                     const SizedBox(height: 28),
+                    SegmentedButton<LoginType>(
+                      segments: const [
+                        ButtonSegment(
+                          value: LoginType.dummyJson,
+                          icon: Icon(Icons.cloud_outlined),
+                          label: Text('DummyJSON'),
+                        ),
+                        ButtonSegment(
+                          value: LoginType.firebase,
+                          icon: Icon(Icons.local_fire_department_outlined),
+                          label: Text('Firebase'),
+                        ),
+                      ],
+                      selected: {_loginType},
+                      onSelectionChanged: _signingIn
+                          ? null
+                          : (selection) => setState(() {
+                              _loginType = selection.single;
+                              _error = null;
+                            }),
+                    ),
+                    const SizedBox(height: 16),
                     TextFormField(
                       controller: _usernameController,
                       textInputAction: TextInputAction.next,
-                      autofillHints: const [AutofillHints.username],
-                      decoration: const InputDecoration(
-                        labelText: 'Username',
-                        prefixIcon: Icon(Icons.person_outline),
-                        border: OutlineInputBorder(),
+                      autofillHints: _loginType == LoginType.firebase
+                          ? const [AutofillHints.email]
+                          : const [AutofillHints.username],
+                      keyboardType: _loginType == LoginType.firebase
+                          ? TextInputType.emailAddress
+                          : TextInputType.text,
+                      decoration: InputDecoration(
+                        labelText: _loginType == LoginType.firebase
+                            ? 'Email address'
+                            : 'Username',
+                        prefixIcon: Icon(
+                          _loginType == LoginType.firebase
+                              ? Icons.mail_outline
+                              : Icons.person_outline,
+                        ),
+                        border: const OutlineInputBorder(),
                       ),
-                      validator: (value) =>
-                          value == null || value.trim().isEmpty
-                          ? 'Enter your username.'
-                          : null,
+                      validator: (value) {
+                        final credential = value?.trim() ?? '';
+                        if (credential.isEmpty) {
+                          return _loginType == LoginType.firebase
+                              ? 'Enter your email address.'
+                              : 'Enter your username.';
+                        }
+                        if (_loginType == LoginType.firebase &&
+                            (!credential.contains('@') ||
+                                !credential.contains('.'))) {
+                          return 'Enter a valid email address.';
+                        }
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
@@ -162,6 +211,14 @@ class _SignInScreenState extends State<SignInScreen> {
                             )
                           : const Icon(Icons.login),
                       label: Text(_signingIn ? 'Signing in...' : 'Sign in'),
+                    ),
+                    const SizedBox(height: 10),
+                    TextButton.icon(
+                      onPressed: _signingIn
+                          ? null
+                          : () => Navigator.pushNamed(context, '/signup'),
+                      icon: const Icon(Icons.person_add_alt_1),
+                      label: const Text('New here? Create an account'),
                     ),
                   ],
                 ),

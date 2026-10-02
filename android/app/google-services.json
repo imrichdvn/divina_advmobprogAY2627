@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1068463627227",
+    "project_id": "divina-advmobprog-ay2627",
+    "storage_bucket": "divina-advmobprog-ay2627.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1068463627227:android:747b76c521b0c5de2d25fe",
+        "android_client_info": {
+          "package_name": "com.example.divina_advmobprog"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAO0cf4LGkqJMfBmkTXVKJHOL0Tn09lsQY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

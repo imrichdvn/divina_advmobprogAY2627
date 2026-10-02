@@ -1,15 +1,44 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../constants.dart';
 import '../models/cart.dart';
 import '../models/product.dart';
 
 class CartService {
-  CartService({http.Client? client}) : _client = client ?? http.Client();
+  CartService({http.Client? client, SharedPreferences? preferences})
+    : _client = client ?? http.Client(),
+      _preferences = preferences;
 
   final http.Client _client;
+  final SharedPreferences? _preferences;
+
+  Future<Cart> getLocalCart(int userId) async {
+    final preferences = await _getPreferences();
+    final savedCart = preferences.getString(_localCartKey(userId));
+    if (savedCart == null) return Cart.empty(userId: userId);
+
+    try {
+      final cart = Cart.fromJson(jsonDecode(savedCart) as Map<String, dynamic>);
+      return cart.userId == userId ? cart : Cart.empty(userId: userId);
+    } on FormatException {
+      await preferences.remove(_localCartKey(userId));
+      return Cart.empty(userId: userId);
+    } on TypeError {
+      await preferences.remove(_localCartKey(userId));
+      return Cart.empty(userId: userId);
+    }
+  }
+
+  Future<void> saveLocalCart(Cart cart) async {
+    final preferences = await _getPreferences();
+    await preferences.setString(
+      _localCartKey(cart.userId),
+      jsonEncode(cart.toJson()),
+    );
+  }
 
   Future<List<Cart>> getAllCarts() async {
     final response = await _client.get(Uri.parse('$apiHost/carts'));
@@ -68,6 +97,29 @@ class CartService {
     return addCart(userId: cart.userId, productQuantities: quantities);
   }
 
+  Cart addProductLocally({required Cart cart, required Product product}) {
+    final existingProduct = cart.products
+        .where((item) => item.id == product.id)
+        .firstOrNull;
+    if (existingProduct != null) {
+      return cart.updateQuantity(product.id, existingProduct.quantity + 1);
+    }
+
+    final total = product.price;
+    final discountedTotal = total * (1 - product.discountPercentage / 100);
+    final cartProduct = CartProduct(
+      id: product.id,
+      title: product.title,
+      price: product.price,
+      quantity: 1,
+      total: total,
+      discountPercentage: product.discountPercentage,
+      discountedTotal: discountedTotal,
+      thumbnail: product.thumbnail,
+    );
+    return cart.copyWithProducts([...cart.products, cartProduct]);
+  }
+
   List<Cart> _parseCarts(Map<String, dynamic> data) {
     return (data['carts'] as List<dynamic>? ?? const [])
         .whereType<Map<String, dynamic>>()
@@ -79,5 +131,11 @@ class CartService {
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw Exception('Failed to $action (${response.statusCode})');
     }
+  }
+
+  String _localCartKey(int userId) => 'local_cart_$userId';
+
+  Future<SharedPreferences> _getPreferences() async {
+    return _preferences ?? SharedPreferences.getInstance();
   }
 }

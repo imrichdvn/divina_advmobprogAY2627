@@ -77,11 +77,13 @@ class _HomeScreenState extends State<HomeScreen> {
             ProductScreen(
               cart: _cart,
               userId: widget.user.id,
+              localOnlyCart: widget.user.accessToken.isEmpty,
               onCartChanged: _updateCart,
             ),
             CartScreen(
               cart: _cart,
               userId: widget.user.id,
+              localOnlyCart: widget.user.accessToken.isEmpty,
               onCartChanged: _updateCart,
             ),
             ProfileScreen(user: widget.user, onSignOut: _signOut),

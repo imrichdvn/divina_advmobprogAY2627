@@ -9,12 +9,15 @@ import 'providers/theme_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/sign_in_screen.dart';
+import 'screens/sign_up_screen.dart';
 import 'screens/splash_screen.dart';
+import 'services/firebase_bootstrap.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   await dotenv.load(fileName: 'assets/.env');
+  await initializeFirebase();
   runApp(const DivinaAdvMobProg());
 }
 
@@ -41,12 +44,20 @@ class DivinaAdvMobProg extends StatelessWidget {
             routes: {
               '/': (context) => const SplashScreen(),
               '/signin': (context) => const SignInScreen(),
+              '/signup': (context) => const SignUpScreen(),
               '/home': (context) {
                 final arguments = ModalRoute.of(context)?.settings.arguments;
                 if (arguments is Map<String, dynamic>) {
                   return HomeScreen(user: User.fromJson(arguments));
                 }
                 return const SplashScreen();
+              },
+              '/welcome': (context) {
+                final arguments = ModalRoute.of(context)?.settings.arguments;
+                if (arguments is Map<String, dynamic>) {
+                  return SplashScreen(authenticatedUser: arguments);
+                }
+                return const SignInScreen();
               },
               '/settings': (context) => const SettingsScreen(),
             },

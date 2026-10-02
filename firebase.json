@@ -1,0 +1,29 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "divina-advmobprog-ay2627",
+          "appId": "1:1068463627227:android:747b76c521b0c5de2d25fe",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "divina-advmobprog-ay2627",
+          "configurations": {
+            "android": "1:1068463627227:android:747b76c521b0c5de2d25fe",
+            "ios": "1:1068463627227:ios:c497267e14a50e2f2d25fe",
+            "web": "1:1068463627227:web:461ea8fe0b71da662d25fe"
+          }
+        }
+      }
+    }
+  },
+  "auth": {
+    "providers": {
+      "anonymous": false,
+      "emailPassword": true
+    }
+  }
+}

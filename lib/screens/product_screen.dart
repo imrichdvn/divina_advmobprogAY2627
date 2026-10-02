@@ -14,11 +14,13 @@ class ProductScreen extends StatefulWidget {
     super.key,
     this.cart,
     this.userId = demoUserId,
+    this.localOnlyCart = false,
     this.onCartChanged,
   });
 
   final Cart? cart;
   final int userId;
+  final bool localOnlyCart;
   final ValueChanged<Cart>? onCartChanged;
 
   @override
@@ -82,19 +84,34 @@ class _ProductScreenState extends State<ProductScreen> {
     setState(() => _addingProductIds.add(product.id));
     try {
       final currentCart =
-          widget.cart ?? _localCart ?? Cart.empty(userId: widget.userId);
+          widget.cart ??
+          _localCart ??
+          (widget.localOnlyCart
+              ? await _cartService.getLocalCart(widget.userId)
+              : Cart.empty(userId: widget.userId));
 
       // Enhancement 3: pass Product values to the documented /carts/add API.
-      final updatedCart = await _cartService.addProductToCart(
-        cart: currentCart,
-        product: product,
-      );
+      final updatedCart = widget.localOnlyCart
+          ? _cartService.addProductLocally(cart: currentCart, product: product)
+          : await _cartService.addProductToCart(
+              cart: currentCart,
+              product: product,
+            );
+      if (widget.localOnlyCart) {
+        await _cartService.saveLocalCart(updatedCart);
+      }
       if (!mounted) return;
       setState(() => _localCart = updatedCart);
       widget.onCartChanged?.call(updatedCart);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('${product.title} added to cart')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            widget.localOnlyCart
+                ? '${product.title} added to your demo cart'
+                : '${product.title} added to cart',
+          ),
+        ),
+      );
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(

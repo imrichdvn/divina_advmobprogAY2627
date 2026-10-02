@@ -12,11 +12,13 @@ class CartScreen extends StatefulWidget {
     super.key,
     this.cart,
     this.userId = demoUserId,
+    this.localOnlyCart = false,
     this.onCartChanged,
   });
 
   final Cart? cart;
   final int userId;
+  final bool localOnlyCart;
   final ValueChanged<Cart>? onCartChanged;
 
   @override
@@ -53,8 +55,9 @@ class _CartScreenState extends State<CartScreen> {
       _error = null;
     });
     try {
-      // Enhancement 3: load only the cart belonging to the selected user ID.
-      final cart = await _service.getCartByUserId(widget.userId);
+      final cart = widget.localOnlyCart
+          ? await _service.getLocalCart(widget.userId)
+          : await _service.getCartByUserId(widget.userId);
       if (!mounted) return;
       setState(() {
         _cart = cart;
@@ -70,7 +73,7 @@ class _CartScreenState extends State<CartScreen> {
     }
   }
 
-  void _changeQuantity(CartProduct product, int change) {
+  Future<void> _changeQuantity(CartProduct product, int change) async {
     final cart = _cart;
     if (cart == null) return;
     final updatedCart = cart.updateQuantity(
@@ -78,12 +81,25 @@ class _CartScreenState extends State<CartScreen> {
       product.quantity + change,
     );
     setState(() => _cart = updatedCart);
+    if (widget.localOnlyCart) {
+      await _service.saveLocalCart(updatedCart);
+    }
     widget.onCartChanged?.call(updatedCart);
   }
 
   Future<void> _confirmOrder() async {
     final cart = _cart;
     if (cart == null || cart.products.isEmpty) return;
+    if (widget.localOnlyCart) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Demo cart is ready. Orders are not saved by DummyJSON.',
+          ),
+        ),
+      );
+      return;
+    }
     setState(() => _confirming = true);
     try {
       // Enhancement 3: send the current product IDs and quantities to /carts/add.

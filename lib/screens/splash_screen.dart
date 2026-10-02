@@ -3,9 +3,10 @@ import 'package:flutter/material.dart';
 import '../services/user_service.dart';
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key, this.userService});
+  const SplashScreen({super.key, this.userService, this.authenticatedUser});
 
   final UserService? userService;
+  final Map<String, dynamic>? authenticatedUser;
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -21,6 +22,16 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> _checkAuthentication() async {
     await Future<void>.delayed(const Duration(milliseconds: 1500));
     if (!mounted) return;
+
+    final authenticatedUser = widget.authenticatedUser;
+    if (authenticatedUser != null) {
+      await Navigator.pushReplacementNamed<void, void>(
+        context,
+        '/home',
+        arguments: authenticatedUser,
+      );
+      return;
+    }
 
     try {
       final userService = widget.userService ?? UserService();
@@ -48,6 +59,7 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final firstName = widget.authenticatedUser?['firstName'] as String?;
     return Scaffold(
       body: Center(
         child: Column(
@@ -70,7 +82,9 @@ class _SplashScreenState extends State<SplashScreen> {
             ),
             const SizedBox(height: 20),
             Text(
-              'Bulldogs Exchange',
+              firstName == null || firstName.isEmpty
+                  ? 'Bulldogs Exchange'
+                  : 'Welcome, $firstName',
               style: Theme.of(
                 context,
               ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
