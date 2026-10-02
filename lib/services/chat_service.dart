@@ -1,0 +1,135 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+import '../models/chat_user.dart';
+import '../models/message.dart';
+import '../models/user.dart' as app;
+
+class ChatService {
+  ChatService({FirebaseFirestore? firestore, FirebaseAuth? auth})
+    : _firestore = firestore ?? FirebaseFirestore.instance,
+      _auth = auth ?? FirebaseAuth.instance;
+
+  final FirebaseFirestore _firestore;
+  final FirebaseAuth _auth;
+
+  String get currentUserId => _auth.currentUser?.uid ?? '';
+  String get currentUserEmail => _auth.currentUser?.email ?? '';
+
+  Stream<List<ChatUser>> getUsersStream() {
+    final ownUid = currentUserId;
+    return _firestore.collection('Users').snapshots().map((snapshot) {
+      final users = snapshot.docs
+          .map((doc) => ChatUser.fromMap(doc.id, doc.data()))
+          .where((user) => user.uid != ownUid && user.email.isNotEmpty)
+          .toList();
+      users.sort(
+        (first, second) => first.displayName.toLowerCase().compareTo(
+          second.displayName.toLowerCase(),
+        ),
+      );
+      return users;
+    });
+  }
+
+  Future<void> syncCurrentUserProfile(app.User profile) async {
+    final uid = currentUserId;
+    if (uid.isEmpty) return;
+    await _firestore.collection('Users').doc(uid).set({
+      'uid': uid,
+      'email': currentUserEmail.isNotEmpty ? currentUserEmail : profile.email,
+      'firstName': profile.firstName,
+      'lastName': profile.lastName,
+      'username': profile.username,
+      'image': profile.image,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  Future<void> sendMessage({
+    required ChatUser receiver,
+    required String message,
+    required String clientMessageId,
+  }) async {
+    final senderId = currentUserId;
+    if (senderId.isEmpty) throw StateError('Sign in with Firebase first.');
+    final normalizedMessage = message.trim();
+    if (normalizedMessage.isEmpty) return;
+    final roomId = _chatRoomId(senderId, receiver.uid);
+    final room = _firestore.collection('chat_rooms').doc(roomId);
+    await room.set({
+      'participants': [senderId, receiver.uid],
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+    await room
+        .collection('messages')
+        .add(
+          MessageModel(
+            id: '',
+            senderId: senderId,
+            senderEmail: currentUserEmail,
+            receiverId: receiver.uid,
+            message: normalizedMessage,
+            timestamp: Timestamp.now(),
+            status: MessageStatus.delivered,
+            clientMessageId: clientMessageId,
+          ).toMap(),
+        );
+  }
+
+  Stream<List<MessageModel>> getMessages(String otherUserId) {
+    final ownUid = currentUserId;
+    if (ownUid.isEmpty) return const Stream.empty();
+    return _firestore
+        .collection('chat_rooms')
+        .doc(_chatRoomId(ownUid, otherUserId))
+        .collection('messages')
+        .orderBy('timestamp', descending: true)
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => MessageModel.fromMap(doc.id, doc.data()))
+              .toList(),
+        );
+  }
+
+  Future<void> markMessagesSeen(
+    String otherUserId,
+    Iterable<MessageModel> messages,
+  ) async {
+    final ownUid = currentUserId;
+    final unread = messages.where(
+      (message) =>
+          message.receiverId == ownUid &&
+          message.senderId == otherUserId &&
+          message.status != MessageStatus.seen,
+    );
+    if (unread.isEmpty) return;
+    final batch = _firestore.batch();
+    final room = _firestore
+        .collection('chat_rooms')
+        .doc(_chatRoomId(ownUid, otherUserId));
+    for (final message in unread) {
+      batch.update(room.collection('messages').doc(message.id), {
+        'status': MessageStatus.seen.name,
+        'seenAt': FieldValue.serverTimestamp(),
+      });
+    }
+    await batch.commit();
+  }
+
+  Future<String?> getUidByEmail(String email) async {
+    final result = await _firestore
+        .collection('Users')
+        .where('email', isEqualTo: email.trim().toLowerCase())
+        .limit(1)
+        .get();
+    if (result.docs.isEmpty) return null;
+    return result.docs.first.data()['uid'] as String? ?? result.docs.first.id;
+  }
+
+  String _chatRoomId(String firstUid, String secondUid) {
+    final ids = [firstUid, secondUid]..sort();
+    return ids.join('_');
+  }
+}

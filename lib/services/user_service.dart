@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase;
 import 'package:firebase_core/firebase_core.dart';
@@ -107,6 +108,7 @@ class UserService {
       await user.updateDisplayName(normalized);
       await user.reload();
       await (await _getPreferences()).setString('username', normalized);
+      await _updateFirestoreProfile({'username': normalized});
     } on firebase.FirebaseAuthException catch (error) {
       throw Exception(_firebaseMessage(error));
     }
@@ -123,6 +125,12 @@ class UserService {
         password: password,
       );
       await user.reauthenticateWithCredential(credential);
+      if (Firebase.apps.isNotEmpty) {
+        await FirebaseFirestore.instance
+            .collection('Users')
+            .doc(user.uid)
+            .delete();
+      }
       await user.delete();
       await _clearSession();
     } on firebase.FirebaseAuthException catch (error) {
@@ -381,7 +389,7 @@ class UserService {
               preferences.getString('username') ??
               firebaseUser.email?.split('@').first ??
               '');
-    await saveUserData({
+    final userData = <String, dynamic>{
       'id': _stableFirebaseId(firebaseUser.uid),
       'username': storedUsername,
       'email': firebaseUser.email ?? '',
@@ -393,7 +401,32 @@ class UserService {
       'loginType': LoginType.firebase.storageValue,
       'accessToken': token,
       'token': token,
-    });
+    };
+    await saveUserData(userData);
+    if (Firebase.apps.isNotEmpty) {
+      await FirebaseFirestore.instance
+          .collection('Users')
+          .doc(firebaseUser.uid)
+          .set({
+            'uid': firebaseUser.uid,
+            'email': firebaseUser.email?.toLowerCase() ?? '',
+            'firstName': storedFirstName,
+            'lastName': storedLastName,
+            'username': storedUsername,
+            'image': firebaseUser.photoURL ?? '',
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+    }
+  }
+
+  Future<void> _updateFirestoreProfile(Map<String, dynamic> data) async {
+    final user = currentUser;
+    if (user == null || Firebase.apps.isEmpty) return;
+    await FirebaseFirestore.instance.collection('Users').doc(user.uid).set({
+      ...data,
+      'uid': user.uid,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
   }
 
   int _stableFirebaseId(String uid) {

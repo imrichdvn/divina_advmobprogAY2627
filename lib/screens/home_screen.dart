@@ -6,6 +6,7 @@ import '../models/user.dart';
 import '../services/user_service.dart';
 import '../widgets/custom_text.dart';
 import 'cart_screen.dart';
+import 'chat_screen.dart';
 import 'product_screen.dart';
 import 'profile_screen.dart';
 
@@ -45,16 +46,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _openChat() {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      useSafeArea: true,
-      builder: (_) => const _ChatSheet(),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -80,6 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
               localOnlyCart: widget.user.accessToken.isEmpty,
               onCartChanged: _updateCart,
             ),
+            ChatScreen(currentUser: widget.user),
             CartScreen(
               cart: _cart,
               userId: widget.user.id,
@@ -89,15 +81,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ProfileScreen(user: widget.user, onSignOut: _signOut),
           ],
         ),
-        // Enhancement 2: Chat is the FAB and is hidden on CartScreen.
-        floatingActionButton: _selectedIndex == 1
-            ? null
-            : FloatingActionButton(
-                tooltip: 'Chat',
-                onPressed: _openChat,
-                child: const Icon(Icons.chat_bubble_outline),
-              ),
-        floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
         bottomNavigationBar: NavigationBar(
           height: 70.h,
           selectedIndex: _selectedIndex,
@@ -109,6 +92,11 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: Icon(Icons.storefront_outlined),
               selectedIcon: Icon(Icons.storefront),
               label: 'Home',
+            ),
+            const NavigationDestination(
+              icon: Icon(Icons.chat_bubble_outline),
+              selectedIcon: Icon(Icons.chat_bubble),
+              label: 'Chat',
             ),
             NavigationDestination(
               icon: _cartIcon(selected: false),
@@ -149,56 +137,11 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     }
+    const titles = ['Home', 'Chat', 'Cart', 'Profile'];
     return CustomText(
-      text: _selectedIndex == 1 ? 'Cart' : 'Profile',
+      text: titles[_selectedIndex],
       fontSize: 20.sp,
       fontWeight: FontWeight.w600,
-    );
-  }
-}
-
-class _ChatSheet extends StatelessWidget {
-  const _ChatSheet();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        24.w,
-        8.h,
-        24.w,
-        MediaQuery.viewInsetsOf(context).bottom + 24.h,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.chat_bubble_rounded,
-            size: 48.sp,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          SizedBox(height: 12.h),
-          Text(
-            'Chat with Bulldogs Exchange',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          SizedBox(height: 6.h),
-          const Text(
-            'Ask about a product, your cart, or an order.',
-            textAlign: TextAlign.center,
-          ),
-          SizedBox(height: 20.h),
-          TextField(
-            autofocus: true,
-            textInputAction: TextInputAction.send,
-            decoration: const InputDecoration(
-              hintText: 'Type a message',
-              prefixIcon: Icon(Icons.message_outlined),
-              border: OutlineInputBorder(),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

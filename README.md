@@ -1,6 +1,6 @@
 # Bulldogs Exchange
 
-Bulldogs Exchange is a Flutter e-commerce application built with DummyJSON. It includes the product catalog and cart from **Lab Activity 3 - API Part II**, plus persistent sign-in and a user profile from **Lab Activity 4 - API Part III**.
+Bulldogs Exchange is a Flutter e-commerce application built with DummyJSON and Firebase. It includes the product catalog and cart from **Lab Activity 3**, persistent profiles and Firebase authentication from **Lab Activities 4-5**, and Firestore chat from **Lab Activity 6**.
 
 ## Features
 
@@ -11,9 +11,10 @@ Bulldogs Exchange is a Flutter e-commerce application built with DummyJSON. It i
 - Adds catalog products through the `/carts/add` endpoint.
 - Increases and decreases cart quantities with automatic total recalculation.
 - Removes an item when Minus is pressed while its quantity is `1`.
-- Provides Home, Cart, and Profile bottom-navigation destinations.
-- Shows Chat as a floating action button on Home and Profile.
-- Hides the Chat button while the Cart screen is selected.
+- Provides Home, Chat, Cart, and Profile bottom-navigation destinations.
+- Lists every other registered Firebase user with name/email search.
+- Supports private real-time Firestore conversations with animated bubbles.
+- Displays sending, delivered, and seen message states.
 - Displays the Bulldogs Exchange logo in the Home header and Profile screen.
 - Supports light and dark themes from the Settings screen.
 - Signs in through the DummyJSON authentication endpoint.
@@ -34,12 +35,16 @@ Bulldogs Exchange is a Flutter e-commerce application built with DummyJSON. It i
 lib/
 |-- models/
 |   |-- cart.dart
+|   |-- chat_user.dart
+|   |-- message.dart
 |   |-- product.dart
 |   `-- user.dart
 |-- providers/
 |   `-- theme_provider.dart
 |-- screens/
 |   |-- cart_screen.dart
+|   |-- chat_detail_screen.dart
+|   |-- chat_screen.dart
 |   |-- detail_screen.dart
 |   |-- home_screen.dart
 |   |-- product_screen.dart
@@ -49,6 +54,7 @@ lib/
 |   `-- settings_screen.dart
 |-- services/
 |   |-- cart_service.dart
+|   |-- chat_service.dart
 |   |-- firebase_bootstrap.dart
 |   |-- product_service.dart
 |   `-- user_service.dart
@@ -153,7 +159,7 @@ DummyJSON provides demo users. For example, use username `emilys` and password `
 
 The sign-in and sign-up screens let the user choose a `LoginType`. In the DummyJSON flow, sign-in sends a username and password to `POST /auth/login`; signup sends the complete profile to `POST /users/add`. DummyJSON simulates writes, so newly registered demo profiles and salted password verifiers are also saved locally for repeat sign-in on the same installation. The returned API profile and access token are normalized by `UserService`, saved to preferences, shown on the welcome splash, and passed to Home and Profile.
 
-In the Firebase flow, sign-in calls `FirebaseAuth.signInWithEmailAndPassword`, while signup calls `createUserWithEmailAndPassword` and updates the Firebase display name. Firebase persists the authenticated session and refreshes ID tokens through its SDK. The additional lab profile fields (first name, last name, age, contact number, and username) are cached locally because this activity requires Firebase Authentication rather than a Firestore database. On app launch, the splash screen asks `UserService.isLoggedIn()` to restore the appropriate DummyJSON or Firebase session before routing.
+In the Firebase flow, sign-in calls `FirebaseAuth.signInWithEmailAndPassword`, while signup calls `createUserWithEmailAndPassword` and updates the Firebase display name. Firebase persists the authenticated session and refreshes ID tokens through its SDK. The additional lab profile fields (first name, last name, age, contact number, and username) are cached locally and synchronized to Firestore for the Lab Activity 6 user directory. On app launch, the splash screen asks `UserService.isLoggedIn()` to restore the appropriate DummyJSON or Firebase session before routing.
 
 ### Main Idea of UserService
 
@@ -168,6 +174,24 @@ Firebase replaces simulated local accounts with real server-backed identity. It 
 The application is connected to Firebase project `divina-advmobprog-ay2627` for Android, iOS, and Web. Email/Password authentication is enabled. FlutterFire generated `lib/firebase_options.dart` and the Android Google Services configuration, while `firebase.json` records the registered app IDs and deployable Authentication provider settings.
 
 Run `flutter pub get`, then start the app. `main.dart` initializes Firebase with `DefaultFirebaseOptions.currentPlatform` before `runApp`. Re-run `flutterfire configure --project=divina-advmobprog-ay2627` whenever another platform is added.
+
+## Lab Activity 6 Discussion
+
+### Firestore Chat Flow
+
+`UserService` synchronizes every Firebase account to `Users/{uid}`. `ChatService` listens to that collection, removes the current account, and gives `ChatScreen` an alphabetized user list. The search bar filters the live list by display name or email. Selecting a user opens `ChatDetailScreen`, where messages are stored under `chat_rooms/{sortedUidPair}/messages` and streamed newest-first.
+
+Each outgoing message starts as a local `sending` bubble. A successful Firestore write changes it to `delivered`; opening the conversation as the receiver updates it to `seen`. The interface uses distinct sender/receiver colors, one- and two-check status icons, and fade/slide transitions. The second navigation destination is Chat, while Cart remains available as the third destination.
+
+### Firebase Backend and Security
+
+The default Firestore Native database is hosted in `us-central1`. Although the activity handout demonstrates globally public rules, this implementation uses authenticated rules: signed-in users can read the user directory, edit only their own profile, and read or send messages only in rooms where their UID is a participant. Only the receiver can mark an incoming message as seen. This preserves the lab behavior without exposing user profiles and conversations publicly.
+
+The deployable configuration is in `firebase.json` and `firestore.rules`. To redeploy it, run:
+
+```sh
+firebase deploy --only firestore:rules --project divina-advmobprog-ay2627
+```
 
 ## Cart Quantity Behavior
 
