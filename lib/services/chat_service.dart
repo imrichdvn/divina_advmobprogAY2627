@@ -57,8 +57,9 @@ class ChatService {
     if (normalizedMessage.isEmpty) return;
     final roomId = _chatRoomId(senderId, receiver.uid);
     final room = _firestore.collection('chat_rooms').doc(roomId);
+    final participants = [senderId, receiver.uid]..sort();
     await room.set({
-      'participants': [senderId, receiver.uid],
+      'participants': participants,
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
     await room
