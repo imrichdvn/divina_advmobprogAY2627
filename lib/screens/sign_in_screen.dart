@@ -18,7 +18,7 @@ class _SignInScreenState extends State<SignInScreen> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _signingIn = false;
-  LoginType _loginType = LoginType.dummyJson;
+  LoginType _loginType = LoginType.firebase;
   String? _error;
 
   @override
@@ -127,6 +127,14 @@ class _SignInScreenState extends State<SignInScreen> {
                               _loginType = selection.single;
                               _error = null;
                             }),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      _loginType == LoginType.firebase
+                          ? 'Sign in with your Firebase Authentication account.'
+                          : 'Demo accounts are stored in this browser only.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                      textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 16),
                     TextFormField(

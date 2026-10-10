@@ -90,6 +90,67 @@ class UserService {
       );
       return credential;
     } on firebase.FirebaseAuthException catch (error) {
+      if (error.code == 'email-already-in-use') {
+        final recovered = await _recoverOrphanedFirebaseAccount(
+          email: email,
+          password: password,
+          firstName: firstName,
+          lastName: lastName,
+          age: age,
+          contactNo: contactNo,
+          username: username,
+        );
+        if (recovered != null) return recovered;
+      }
+      throw Exception(_firebaseMessage(error));
+    }
+  }
+
+  Future<firebase.UserCredential?> _recoverOrphanedFirebaseAccount({
+    required String email,
+    required String password,
+    required String firstName,
+    required String lastName,
+    required int age,
+    required String contactNo,
+    required String username,
+  }) async {
+    final currentUser = _firebaseAuth.currentUser;
+    final normalizedEmail = email.trim().toLowerCase();
+    if (currentUser?.email?.trim().toLowerCase() != normalizedEmail) {
+      return null;
+    }
+
+    final profile = await FirebaseFirestore.instance
+        .collection('Users')
+        .doc(currentUser!.uid)
+        .get();
+    if (profile.exists) return null;
+
+    try {
+      final credential = await _firebaseAuth.signInWithEmailAndPassword(
+        email: normalizedEmail,
+        password: password,
+      );
+      final user = credential.user;
+      if (user == null) {
+        throw Exception('Firebase did not return a user.');
+      }
+      final displayName = username.trim().isEmpty
+          ? '$firstName $lastName'.trim()
+          : username.trim();
+      await user.updateDisplayName(displayName);
+      await user.reload();
+      await _saveFirebaseUser(
+        _firebaseAuth.currentUser ?? user,
+        firstName: firstName,
+        lastName: lastName,
+        age: age,
+        contactNo: contactNo,
+        username: username,
+      );
+      return credential;
+    } on firebase.FirebaseAuthException catch (error) {
       throw Exception(_firebaseMessage(error));
     }
   }
@@ -107,7 +168,12 @@ class UserService {
     try {
       await user.updateDisplayName(normalized);
       await user.reload();
-      await (await _getPreferences()).setString('username', normalized);
+      final preferences = await _getPreferences();
+      await preferences.setString('username', normalized);
+      await preferences.setString(
+        _firebasePreferenceKey(user.uid, 'username'),
+        normalized,
+      );
       await _updateFirestoreProfile({'username': normalized});
     } on firebase.FirebaseAuthException catch (error) {
       throw Exception(_firebaseMessage(error));
@@ -324,9 +390,9 @@ class UserService {
 
   Future<Map<String, dynamic>> getUserData() async {
     final preferences = await _getPreferences();
-    final loginType = LoginType.fromValue(preferences.getString('loginType'));
-    if (loginType == LoginType.firebase && currentUser != null) {
-      await _saveFirebaseUser(currentUser);
+    final authenticatedUser = currentUser;
+    if (authenticatedUser != null) {
+      return _saveFirebaseUser(authenticatedUser);
     }
     return {
       'id': preferences.getInt('id') ?? 0,
@@ -356,6 +422,7 @@ class UserService {
   Future<User> getUser() async => User.fromJson(await getUserData());
 
   Future<bool> isLoggedIn() async {
+    if (currentUser != null) return true;
     final preferences = await _getPreferences();
     final loginType = LoginType.fromValue(preferences.getString('loginType'));
     if (loginType == LoginType.firebase) return currentUser != null;
@@ -367,7 +434,7 @@ class UserService {
 
   Future<void> logout() => signOut();
 
-  Future<void> _saveFirebaseUser(
+  Future<Map<String, dynamic>> _saveFirebaseUser(
     firebase.User? firebaseUser, {
     String? firstName,
     String? lastName,
@@ -379,14 +446,20 @@ class UserService {
       throw Exception('Firebase did not return a user.');
     }
     final preferences = await _getPreferences();
+    final uid = firebaseUser.uid;
     final token = await firebaseUser.getIdToken() ?? '';
     final storedFirstName =
-        firstName ?? preferences.getString('firstName') ?? '';
-    final storedLastName = lastName ?? preferences.getString('lastName') ?? '';
+        firstName ??
+        preferences.getString(_firebasePreferenceKey(uid, 'firstName')) ??
+        '';
+    final storedLastName =
+        lastName ??
+        preferences.getString(_firebasePreferenceKey(uid, 'lastName')) ??
+        '';
     final storedUsername = username?.trim().isNotEmpty == true
         ? username!.trim()
         : (firebaseUser.displayName ??
-              preferences.getString('username') ??
+              preferences.getString(_firebasePreferenceKey(uid, 'username')) ??
               firebaseUser.email?.split('@').first ??
               '');
     final userData = <String, dynamic>{
@@ -396,28 +469,52 @@ class UserService {
       'firstName': storedFirstName,
       'lastName': storedLastName,
       'image': firebaseUser.photoURL ?? '',
-      'age': age ?? preferences.getInt('age') ?? 0,
-      'contactNo': contactNo ?? preferences.getString('contactNo') ?? '',
+      'age': age ?? preferences.getInt(_firebasePreferenceKey(uid, 'age')) ?? 0,
+      'contactNo':
+          contactNo ??
+          preferences.getString(_firebasePreferenceKey(uid, 'contactNo')) ??
+          '',
       'loginType': LoginType.firebase.storageValue,
       'accessToken': token,
       'token': token,
     };
+    await preferences.setString(
+      _firebasePreferenceKey(uid, 'firstName'),
+      storedFirstName,
+    );
+    await preferences.setString(
+      _firebasePreferenceKey(uid, 'lastName'),
+      storedLastName,
+    );
+    await preferences.setString(
+      _firebasePreferenceKey(uid, 'username'),
+      storedUsername,
+    );
+    await preferences.setInt(
+      _firebasePreferenceKey(uid, 'age'),
+      userData['age'] as int,
+    );
+    await preferences.setString(
+      _firebasePreferenceKey(uid, 'contactNo'),
+      userData['contactNo'] as String,
+    );
     await saveUserData(userData);
     if (Firebase.apps.isNotEmpty) {
-      await FirebaseFirestore.instance
-          .collection('Users')
-          .doc(firebaseUser.uid)
-          .set({
-            'uid': firebaseUser.uid,
-            'email': firebaseUser.email?.toLowerCase() ?? '',
-            'firstName': storedFirstName,
-            'lastName': storedLastName,
-            'username': storedUsername,
-            'image': firebaseUser.photoURL ?? '',
-            'updatedAt': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
+      await FirebaseFirestore.instance.collection('Users').doc(uid).set({
+        'uid': uid,
+        'email': firebaseUser.email?.toLowerCase() ?? '',
+        'firstName': storedFirstName,
+        'lastName': storedLastName,
+        'username': storedUsername,
+        'image': firebaseUser.photoURL ?? '',
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
     }
+    return userData;
   }
+
+  String _firebasePreferenceKey(String uid, String field) =>
+      'firebase_${uid}_$field';
 
   Future<void> _updateFirestoreProfile(Map<String, dynamic> data) async {
     final user = currentUser;

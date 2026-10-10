@@ -42,6 +42,9 @@ class User {
 
   String get fullName => '$firstName $lastName'.trim();
 
+  bool get usesLocalCart =>
+      loginType == LoginType.firebase || accessToken.isEmpty;
+
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
       id: (json['id'] as num?)?.toInt() ?? 0,

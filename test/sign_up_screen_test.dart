@@ -1,8 +1,24 @@
 import 'package:divina_advmobprog/screens/sign_up_screen.dart';
+import 'package:divina_advmobprog/models/user.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('Firebase is selected by default for account creation', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: SignUpScreen()));
+
+    final selector = tester.widget<SegmentedButton<LoginType>>(
+      find.byType(SegmentedButton<LoginType>),
+    );
+    expect(selector.selected, {LoginType.firebase});
+    expect(
+      find.text('Creates a real Firebase account for sign-in and chat.'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('sign-up form validates required fields and email', (
     tester,
   ) async {

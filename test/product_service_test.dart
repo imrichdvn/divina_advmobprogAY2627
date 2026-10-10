@@ -45,4 +45,47 @@ void main() {
     expect(products.first.title, 'First product');
     expect(products.last.id, 194);
   });
+
+  test('getAllProducts retries a temporary connection failure', () async {
+    var attempts = 0;
+    final client = MockClient((request) async {
+      attempts++;
+      if (attempts == 1) {
+        throw http.ClientException('Temporary failure', request.url);
+      }
+      return http.Response(jsonEncode({'products': const []}), 200);
+    });
+
+    await ProductService(
+      client: client,
+      retryDelay: Duration.zero,
+    ).getAllProducts();
+
+    expect(attempts, 2);
+  });
+
+  test('getAllProducts reports a friendly error after retrying', () async {
+    var attempts = 0;
+    final client = MockClient((request) async {
+      attempts++;
+      throw http.ClientException('Failed to fetch', request.url);
+    });
+
+    final request = ProductService(
+      client: client,
+      retryDelay: Duration.zero,
+    ).getAllProducts();
+
+    await expectLater(
+      request,
+      throwsA(
+        isA<ProductConnectionException>().having(
+          (error) => error.toString(),
+          'message',
+          contains('Please check your internet connection'),
+        ),
+      ),
+    );
+    expect(attempts, 3);
+  });
 }

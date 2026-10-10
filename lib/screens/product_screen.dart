@@ -107,7 +107,7 @@ class _ProductScreenState extends State<ProductScreen> {
         SnackBar(
           content: Text(
             widget.localOnlyCart
-                ? '${product.title} added to your demo cart'
+                ? '${product.title} added to your local cart'
                 : '${product.title} added to cart',
           ),
         ),
@@ -170,6 +170,8 @@ class _ProductScreenState extends State<ProductScreen> {
                 child: Text(
                   _loading
                       ? 'Loading the complete catalog...'
+                      : _error != null
+                      ? 'Products unavailable'
                       : '${filteredProducts.length} of ${_products.length} products',
                   style: Theme.of(context).textTheme.labelLarge,
                 ),

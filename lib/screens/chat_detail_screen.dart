@@ -24,6 +24,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   final _scrollController = ScrollController();
   MessageModel? _pendingMessage;
   bool _sending = false;
+  bool _markingSeen = false;
 
   @override
   void dispose() {
@@ -73,6 +74,21 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     }
   }
 
+  Future<void> _markMessagesSeen(List<MessageModel> messages) async {
+    if (_markingSeen) return;
+    _markingSeen = true;
+    try {
+      await widget.chatService.markMessagesSeen(widget.receiver.uid, messages);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update message status: $error')),
+      );
+    } finally {
+      _markingSeen = false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
@@ -119,7 +135,15 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 stream: widget.chatService.getMessages(widget.receiver.uid),
                 builder: (context, snapshot) {
                   if (snapshot.hasError) {
-                    return Center(child: Text('Could not load messages.'));
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Text(
+                          'Could not load messages: ${snapshot.error}',
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    );
                   }
                   if (!snapshot.hasData) {
                     return const Center(child: CircularProgressIndicator());
@@ -134,10 +158,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     messages.insert(0, pending);
                   }
                   WidgetsBinding.instance.addPostFrameCallback((_) {
-                    widget.chatService.markMessagesSeen(
-                      widget.receiver.uid,
-                      snapshot.data!,
-                    );
+                    if (mounted) _markMessagesSeen(snapshot.data!);
                   });
                   if (messages.isEmpty) {
                     return Center(
@@ -199,6 +220,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       enabled: !_sending,
                       minLines: 1,
                       maxLines: 5,
+                      maxLength: 4000,
                       textCapitalization: TextCapitalization.sentences,
                       textInputAction: TextInputAction.newline,
                       decoration: const InputDecoration(

@@ -1,4 +1,6 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import '../firebase_options.dart';
 
@@ -14,10 +16,13 @@ Future<bool> initializeFirebase() async {
         options: DefaultFirebaseOptions.currentPlatform,
       );
     }
-    return true;
   } on FirebaseException {
     return false;
   } catch (_) {
     return false;
   }
+  if (kIsWeb) {
+    await FirebaseAuth.instance.setPersistence(Persistence.SESSION);
+  }
+  return true;
 }

@@ -55,6 +55,16 @@ class ChatService {
     if (senderId.isEmpty) throw StateError('Sign in with Firebase first.');
     final normalizedMessage = message.trim();
     if (normalizedMessage.isEmpty) return;
+    if (receiver.uid.isEmpty || receiver.uid == senderId) {
+      throw ArgumentError('Choose another valid chat user.');
+    }
+    if (normalizedMessage.length > 4000) {
+      throw ArgumentError('Messages must be 4000 characters or fewer.');
+    }
+    if (clientMessageId.trim().isEmpty || clientMessageId.contains('/')) {
+      throw ArgumentError.value(clientMessageId, 'clientMessageId');
+    }
+
     final roomId = _chatRoomId(senderId, receiver.uid);
     final room = _firestore.collection('chat_rooms').doc(roomId);
     final participants = [senderId, receiver.uid]..sort();
@@ -62,20 +72,32 @@ class ChatService {
       'participants': participants,
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
-    await room
-        .collection('messages')
-        .add(
-          MessageModel(
-            id: '',
-            senderId: senderId,
-            senderEmail: currentUserEmail,
-            receiverId: receiver.uid,
-            message: normalizedMessage,
-            timestamp: Timestamp.now(),
-            status: MessageStatus.delivered,
-            clientMessageId: clientMessageId,
-          ).toMap(),
-        );
+
+    final messageRef = room.collection('messages').doc(clientMessageId);
+    final messageData = MessageModel(
+      id: clientMessageId,
+      senderId: senderId,
+      senderEmail: currentUserEmail,
+      receiverId: receiver.uid,
+      message: normalizedMessage,
+      timestamp: Timestamp.now(),
+      status: MessageStatus.delivered,
+      clientMessageId: clientMessageId,
+    ).toMap();
+    await _firestore.runTransaction((transaction) async {
+      final existingMessage = await transaction.get(messageRef);
+      if (existingMessage.exists) {
+        final existingData = existingMessage.data();
+        if (existingData?['senderId'] == senderId &&
+            existingData?['receiverId'] == receiver.uid &&
+            existingData?['message'] == normalizedMessage &&
+            existingData?['clientMessageId'] == clientMessageId) {
+          return;
+        }
+        throw StateError('This message ID is already in use.');
+      }
+      transaction.set(messageRef, messageData);
+    });
   }
 
   Stream<List<MessageModel>> getMessages(String otherUserId) {
@@ -99,24 +121,31 @@ class ChatService {
     Iterable<MessageModel> messages,
   ) async {
     final ownUid = currentUserId;
-    final unread = messages.where(
-      (message) =>
-          message.receiverId == ownUid &&
-          message.senderId == otherUserId &&
-          message.status != MessageStatus.seen,
-    );
+    if (ownUid.isEmpty) return;
+    final unread = messages
+        .where(
+          (message) =>
+              message.receiverId == ownUid &&
+              message.senderId == otherUserId &&
+              message.status == MessageStatus.delivered,
+        )
+        .toList();
     if (unread.isEmpty) return;
-    final batch = _firestore.batch();
     final room = _firestore
         .collection('chat_rooms')
         .doc(_chatRoomId(ownUid, otherUserId));
-    for (final message in unread) {
-      batch.update(room.collection('messages').doc(message.id), {
-        'status': MessageStatus.seen.name,
-        'seenAt': FieldValue.serverTimestamp(),
-      });
+
+    for (var offset = 0; offset < unread.length; offset += 500) {
+      final batch = _firestore.batch();
+      final end = offset + 500 < unread.length ? offset + 500 : unread.length;
+      for (final message in unread.sublist(offset, end)) {
+        batch.update(room.collection('messages').doc(message.id), {
+          'status': MessageStatus.seen.name,
+          'seenAt': FieldValue.serverTimestamp(),
+        });
+      }
+      await batch.commit();
     }
-    await batch.commit();
   }
 
   Future<String?> getUidByEmail(String email) async {

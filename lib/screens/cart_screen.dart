@@ -94,7 +94,7 @@ class _CartScreenState extends State<CartScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Demo cart is ready. Orders are not saved by DummyJSON.',
+            'Your cart is saved locally. Order submission is not configured.',
           ),
         ),
       );

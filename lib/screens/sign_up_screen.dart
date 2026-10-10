@@ -28,7 +28,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _creatingAccount = false;
-  LoginType _loginType = LoginType.dummyJson;
+  LoginType _loginType = LoginType.firebase;
   String? _error;
 
   @override
@@ -134,6 +134,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               _loginType = selection.single;
                               _error = null;
                             }),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _loginType == LoginType.firebase
+                          ? 'Creates a real Firebase account for sign-in and chat.'
+                          : 'Demo only: this account is saved in this browser, not Firebase.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                      textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 18),
                     Row(
